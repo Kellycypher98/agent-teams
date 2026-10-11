@@ -5,7 +5,7 @@
 import 'dotenv/config';
 
 export const QUEUE = 'agent-tasks';
-export const CONCURRENCY = 2;
+export const CONCURRENCY = Number(process.env.CONCURRENCY) || 3; // 3 so a whole standup runs at once
 export const useRedis = Boolean(process.env.REDIS_URL);
 
 let nextId = 1;

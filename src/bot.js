@@ -63,25 +63,38 @@ async function handle({ text, user, channel, ts, threadTs, say, files = [] }) {
     const lines = agentNames.map((k) => `${agents[k].emoji} *${agents[k].name}* (${agents[k].role}) — ${agents[k].description}`);
     await say({
       thread_ts: rootTs,
-      text: `Your team:\n${lines.join('\n')}\n\nJust talk normally — e.g. _"Kai, can you look at the login bug?"_. Reply in the thread to keep chatting with the same person.`,
+      text: `Your team:\n${lines.join('\n')}\n\nJust talk normally — e.g. _"Kai, can you look at the login bug?"_. Reply in the thread to keep chatting with the same person. In #standup everyone answers unless you name someone.`,
     });
     return;
   }
 
-  // In an existing thread: stay with the same teammate unless you name someone else.
   const cfg = await channelConfig(channel);
   const existing = getThread(key);
   const named = addressed(clean);
+  const chan = channelNames.get(channel) || channel;
+  await app.client.reactions.add({ channel, timestamp: ts, name: 'eyes' }).catch(() => {});
+  const job = { task: clean, channel, threadTs: rootTs, msgTs: ts, user, key, context: cfg?.context, files: slimFiles(files) };
+
+  // Team channels (mode 'all'): everyone replies unless you name someone. Each teammate keeps
+  // their own memory of the thread.
+  if (cfg?.mode === 'all') {
+    const who = named ? [named] : cfg.team;
+    if (!existing) setThread(key, { mode: 'all' });
+    log.info('message', { channel: chan, agents: who.map((k) => agents[k].name).join(','), routedBy: named ? 'name' : 'team',
+      thread: key, newThread: !existing, text: preview(clean), files: files.length || undefined });
+    for (const agent of who) await enqueue({ ...job, agent, sessionKey: `${key}:${agent}` });
+    return;
+  }
+
+  // Otherwise one teammate per thread: stay with them unless you name someone else.
   const agent = named || existing?.agent || (await route(clean, cfg?.team));
   const routedBy = named ? 'name' : existing?.agent ? 'thread' : (cfg?.team?.length === 1 ? 'channel' : 'router');
   log.info('message', {
-    channel: channelNames.get(channel) || channel, agent: agents[agent].name, routedBy,
+    channel: chan, agent: agents[agent].name, routedBy,
     thread: key, newThread: !existing, text: preview(clean), files: files.length || undefined,
   });
   if (!existing || existing.agent !== agent) setThread(key, { agent, sessionId: existing?.agent === agent ? existing.sessionId : undefined });
-
-  await app.client.reactions.add({ channel, timestamp: ts, name: 'eyes' }).catch(() => {});
-  await enqueue({ agent, task: clean, channel, threadTs: rootTs, msgTs: ts, user, key, context: cfg?.context, files: slimFiles(files) });
+  await enqueue({ ...job, agent });
 }
 
 // @mentions in channels

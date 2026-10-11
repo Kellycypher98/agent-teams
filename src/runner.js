@@ -30,11 +30,12 @@ async function postAs(agentKey, { channel, thread_ts, text }) {
   return slack.chat.postMessage({ channel, thread_ts, text: `${a.emoji} *${a.name}:* ${text}` });
 }
 
-async function runAgent({ agent, task, key, context, files }) {
+async function runAgent({ agent, task, key, sessionKey, context, files }) {
+  const sKey = sessionKey || key;
   const a = agents[agent];
   fs.mkdirSync(a.cwd, { recursive: true });
 
-  const prev = getThread(key);
+  const prev = getThread(sKey);
   const resume = prev?.agent === agent ? prev.sessionId : undefined;
 
   let result = '';
@@ -85,7 +86,7 @@ async function runAgent({ agent, task, key, context, files }) {
     }
   }
 
-  if (sessionId) setThread(key, { agent, sessionId });
+  if (sessionId) setThread(sKey, { agent, sessionId });
   return { result, cost, turns, toolsUsed };
 }
 
@@ -93,9 +94,10 @@ async function runAgent({ agent, task, key, context, files }) {
 const threadLocks = new Map();
 
 export function processJob(data) {
-  const prev = threadLocks.get(data.key) || Promise.resolve();
+  const lockKey = data.sessionKey || data.key;
+  const prev = threadLocks.get(lockKey) || Promise.resolve();
   const next = prev.then(() => handleJob(data));
-  threadLocks.set(data.key, next.catch(() => {}));
+  threadLocks.set(lockKey, next.catch(() => {}));
   return next;
 }
 

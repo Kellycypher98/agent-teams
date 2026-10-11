@@ -4,6 +4,7 @@
 // team:    who works in this channel. The first one is the default;
 //          with more than one, the manager picks between them.
 // context: extra background every teammate gets in this channel.
+// mode:    'all' = every teammate replies to each new post (unless you name one). Default: one teammate.
 //
 // In channels listed here, the team reads every message you post, no @mention needed.
 // In channels not listed, they only respond when you @mention the bot.
@@ -16,8 +17,10 @@ const jobHunt = {
 
 export const channels = {
   standup: {
-    team: ['writer', 'code', 'research'],
-    context: 'General team channel. Kelvin drops anything here.',
+    team: ['code', 'research', 'writer'],
+    mode: 'all',
+    context: 'Team standup. Kelvin posts updates, plans or questions and the whole team weighs in. ' +
+      'Give your own take from your role in a few lines; skip anything outside your area rather than repeating teammates.',
   },
   aloud: {
     team: ['code', 'writer'],

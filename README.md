@@ -65,7 +65,7 @@ DM the bot or `@agents` it in a channel, and talk like you would to coworkers:
 
 ### Team channels
 
-`src/channels.js` gives channels a default teammate and background context, currently `#standup` (everyone), `#aloud` → Kai + Remy, `#thesis` and `#job-hunt` → Nova + Remy. In those channels you don't need to @mention anyone; just post. Run `/invite @agents` in each one. Private channels need the `groups:read` and `groups:history` scopes plus the `message.groups` event (all in the manifest). Channels not in the list only respond to @mentions.
+`src/channels.js` gives channels a default teammate and background context, currently `#standup` (everyone replies to each post unless you name someone), `#aloud` → Kai + Remy, `#thesis` and `#job-hunt` → Nova + Remy. In those channels you don't need to @mention anyone; just post. Run `/invite @agents` in each one. Private channels need the `groups:read` and `groups:history` scopes plus the `message.groups` event (all in the manifest). Channels not in the list only respond to @mentions.
 
 Each teammate posts under their own name and avatar (needs the `chat:write.customize` scope, which is in the manifest).
 
