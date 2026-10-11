@@ -1,0 +1,28 @@
+{
+  "name": "agent-team",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A team of Claude agents you text on Slack. They work in the background and ping you when done.",
+  "scripts": {
+    "start": "node src/bot.js",
+    "bot": "node src/bot.js",
+    "worker": "node src/worker.js",
+    "dev": "node --watch src/bot.js & node --watch src/worker.js",
+    "redis": "docker compose up -d redis"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.296",
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@slack/bolt": "^5.1.0",
+    "@slack/web-api": "^8.2.0",
+    "bullmq": "^6.3.12",
+    "dotenv": "^18.0.7",
+    "exceljs": "^4.4.0",
+    "ioredis": "^6.0.0",
+    "mammoth": "^1.12.0"
+  }
+}
