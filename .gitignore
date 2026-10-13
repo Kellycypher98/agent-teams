@@ -1,5 +1,20 @@
-node_modules
+# dependencies
+node_modules/
+
+# secrets: never commit
 .env
-data
-workspace
+.env.*
+!.env.example
 deploy/.deploy.env
+*.pem
+
+# runtime state (conversations, approvals, spend, tokens)
+data/
+workspace/
+
+# local junk
+.DS_Store
+*.log
+*.zip
+*.xlsx
+coverage/

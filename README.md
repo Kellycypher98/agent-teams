@@ -1,118 +1,95 @@
 # Agent Team
 
-A team of Claude agents you text on Slack. You send a task, a manager picks the right agent, the agent works in the background, and you get a ping in the thread when it's done.
+[![CI](https://github.com/Kellycypher98/agent-teams/actions/workflows/ci.yml/badge.svg)](https://github.com/Kellycypher98/agent-teams/actions/workflows/ci.yml) ![Node 22](https://img.shields.io/badge/node-22-339933) ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
-```
-You (Slack DM / @agents)
-   │
-   ▼
-bot.js ── router.js ──► picks agent (prefix or Haiku)
-   │
-   ▼
-Redis queue (BullMQ)
-   │
-   ▼
-worker.js ── Claude Agent SDK ──► 🛠️ code │ 🔎 research │ ✍️ writer
-   │
-   ▼
-Reply in your Slack thread + @mention
-```
+**Four Claude agents that work like teammates, reachable from Slack and Telegram.**
 
-## Setup (about 15 min)
+I message them the way I'd message coworkers: _"Kai and Nova, should I add 2FA to Aloud?"_ Both answer, each sees what the other said, and they pass work between themselves. Every morning Remy writes an X post, hands it to Iris, and Iris sends it to me to proofread. Nothing is emailed or booked until I tap ✅.
 
-1. **Install**
-   ```bash
-   npm install
-   cp .env.example .env
-   ```
+| | Teammate | Does | Runs on |
+|---|---|---|---|
+| 🛠️ | **Kai**, engineer | Reads, edits and tests code in my repos, commits to branches (never pushes) | Sonnet |
+| 🔎 | **Nova**, researcher | Searches and reads the web, cites sources | Sonnet |
+| ✍️ | **Remy**, writer | Posts, emails, cover letters, the daily X post | Haiku |
+| 📅 | **Iris**, assistant | Drafts and sends email from Gmail and Outlook, checks both calendars, books events, makes `.ics` files | Sonnet |
 
-2. **Slack app**
-   - Go to api.slack.com/apps → *Create New App* → *From a manifest*, then paste `slack-manifest.yml`.
-   - *Basic Information* → *App-Level Tokens*: create a token with `connections:write`. That's your `SLACK_APP_TOKEN`.
-   - *Install App* → copy the Bot token into `SLACK_BOT_TOKEN`.
-   - Copy the signing secret into `SLACK_SIGNING_SECRET`.
-   - In Slack, open your profile → ⋮ → *Copy member ID*, and put it in `OWNER_SLACK_ID`.
+![Architecture](docs/architecture.png)
 
-3. **Anthropic key**: put it in `ANTHROPIC_API_KEY` (console.anthropic.com).
+## What it does
 
-4. **Give the code agent repos**
-   ```bash
-   mkdir workspace && cd workspace && git clone <your-repo>
-   ```
+- **Talk to one, several or the whole team.** Name someone, name several (`Kai and Nova, …`, `@kai_bot @nova_bot`), or just post in a project channel and a Claude Haiku router picks who fits. Follow-ups stay with the same teammate or group.
+- **Teamwork between agents.** An `ask_teammate` tool lets one agent queue work for another with full context: Nova researches, Remy writes it up; Remy drafts, Iris sends. A shared conversation log means the second teammate builds on the first instead of repeating it.
+- **Routines.** A scheduler runs multi-step jobs (Remy writes silently → Iris delivers). Agents can propose new routines ("every Friday at 17:00…"), which only start after approval.
+- **Human in the loop.** Sending an email, adding a calendar event and creating a routine all show ✅ / ❌ buttons. Each action runs exactly once, exactly as previewed, and expires after 48 h.
+- **Files both ways.** Attach PDFs, Word, Excel, images or code; teammates read them. They can send back calendar files and other documents.
+- **Two chat apps, one brain.** Slack (one app, four personas) and Telegram (four bots, forum topics, DMs) run side by side on the same memory, routines and budget.
+- **Cost controls.** Cheaper models where they're enough, a cap per task, a daily budget, and the cost on every reply.
 
-5. **Run**
-   ```bash
-   npm start
-   ```
-   No Redis needed: jobs run in the same process. For production, set `REDIS_URL`
-   and run `npm run worker` alongside the bot so jobs survive restarts.
+## Design decisions
 
-## Using it
+- **Platform-agnostic core.** Routing, teamwork, routines and approvals talk to a small adapter interface (`post`, `edit`, `askApproval`, `sendFile`, `dmWhere`, …). Adding Telegram meant writing one adapter, not touching the core.
+- **Least privilege per agent.** Every agent gets an explicit tool list and runs in the SDK's `dontAsk` mode, so anything else is refused. Only Iris has mail tools; only Kai has file and shell tools, working in `workspace/` under a non-root service user.
+- **Email is untrusted input.** Iris is told never to follow instructions inside an email, and even if she were tricked, nothing leaves without my ✅. Attachments are restricted to the workspace (path traversal is tested).
+- **Hand-offs are just jobs.** A hand-off goes through the same queue, budget and per-conversation lock as a message, capped at three hops so agents can't bounce work forever.
+- **No inbound ports.** Slack Socket Mode and Telegram long polling both connect outward, so the server only exposes SSH from one IP.
+- **Boring persistence.** Sessions, conversation logs, approvals, routines and spend are small JSON files with debounced writes. Setting `REDIS_URL` swaps the in-memory queue for BullMQ when it needs to scale.
 
-Your team: 🛠️ *Kai* (engineer), 🔎 *Nova* (researcher), ✍️ *Remy* (writer).
+## Stack
 
-DM the bot or `@agents` it in a channel, and talk like you would to coworkers:
+Node.js 22 (ESM) · [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview) with in-process MCP tools · Anthropic API · Slack Bolt (Socket Mode) · grammY (Telegram) · Gmail and Google Calendar REST (OAuth with PKCE) · Microsoft Graph (device-code flow) · zod · AWS EC2 + systemd · `node:test` + GitHub Actions
 
-- `Kai, add input validation to the signup form in kassenwerk`
-- `hey Nova, what are the newest prompt-injection defenses?`
-- `Remy can you draft a message to my landlord about the heating`
-- No name? The manager picks who fits.
-- **Reply in the thread** to keep chatting with the same teammate. They remember the whole thread, even after a restart.
-- **Name someone else mid-thread** ("Nova, double-check that") to hand the conversation over.
-- In channels, once a teammate is in a thread, you can reply without @mentioning.
-- **Attach files** (PDF, Word, Excel, images, text or code) to any message. Teammates read them, and they're saved under `workspace/uploads/` so Kai can work with them too. Needs the `files:read` scope.
-- `help` lists the team.
+## Quick start
 
-### Team channels
-
-`src/channels.js` gives channels a default teammate and background context, currently `#standup` (everyone replies to each post unless you name someone), `#aloud` → Kai + Remy, `#thesis` and `#job-hunt` → Nova + Remy. In those channels you don't need to @mention anyone; just post. Run `/invite @agents` in each one. Private channels need the `groups:read` and `groups:history` scopes plus the `message.groups` event (all in the manifest). Channels not in the list only respond to @mentions.
-
-Each teammate posts under their own name and avatar (needs the `chat:write.customize` scope, which is in the manifest).
-
-## Add an agent
-
-Add one entry to `src/agents.js` (name, icon, role, description, tools, prompt) and restart. That's it. The router learns about it from the description.
-
-## Safety defaults
-
-- Only `OWNER_SLACK_ID` can give orders.
-- Agents run in `dontAsk` mode, so they can only use the tools listed for them. Everything else is refused.
-- The code agent is told never to push or touch `.env`. Review its branches before merging.
-- Every report shows the cost of the run.
-
-## Hosting on AWS (EC2)
-
-1. **Launch an instance** (EC2 console → Launch instance), region *Europe (Frankfurt)*:
-   - Ubuntu Server 24.04 LTS, **t3.small** (2 GB RAM), 20 GB disk
-   - Key pair: create `agent-team`, save the `.pem` to `~/.ssh/` and run `chmod 400 ~/.ssh/agent-team.pem`
-   - Security group: **SSH from My IP only**. No other inbound ports (Socket Mode connects outbound).
-2. **Configure deploy**: `cp deploy/.deploy.env.example deploy/.deploy.env` and fill in the instance's public IP.
-3. **Stop the bot on your Mac** (Ctrl+C) so only one copy is connected to Slack.
-4. **First deploy**: `./deploy/deploy.sh --first`
-5. **Later updates**: `./deploy/deploy.sh`
-
-Logs: `ssh -i ~/.ssh/agent-team.pem ubuntu@<ip> 'journalctl -u <APP_NAME> -f'` (APP_NAME from `deploy/.deploy.env`, default `agent-team`)
-Repos for Kai: SSH in and `git clone` them into `~/agent-team/workspace/`.
-
-## Logs
-
-Every message and job gets one line, e.g.:
-
-```
-2026-10-11T14:02:11Z INFO  message channel=thesis agent=Nova routedBy=channel newThread=true text="what are good topics…"
-2026-10-11T14:02:29Z INFO  job done agent=Nova secs=17.9 cost=$0.041 turns=4 tools=WebSearchx3,WebFetchx1
+```bash
+npm install
+cp .env.example .env      # add ANTHROPIC_API_KEY plus Slack and/or Telegram tokens
+npm start
 ```
 
-From your Mac:
+Full setup (Slack app, Telegram bots, Google and Microsoft auth, AWS deploy, logs, costs): **[docs/SETUP.md](docs/SETUP.md)**.
 
-- `./deploy/logs.sh` follows live logs
-- `./deploy/logs.sh errors` shows warnings and errors from the last 24h
-- `./deploy/logs.sh today` shows everything since midnight
+## Tests
 
-Settings in `.env`: `LOG_LEVEL=debug` also logs each tool call, `LOG_FORMAT=json` gives machine-readable lines, and `LOG_CHANNEL=agent-logs` posts a 🚨 to that Slack channel on every error (create it and `/invite @agents`; name or ID both work). The server keeps 30 days or 200 MB of logs, whichever is smaller.
+```bash
+npm test
+```
 
-## Next steps
+28 tests run in CI on every push: formatting, routing, ICS generation across daylight-saving changes, MIME encoding, the approval state machine, Gmail/Calendar/Outlook flows against a fake HTTP layer, and end-to-end runs of four Telegram bots against a fake Bot API with the Agent SDK mocked (group replies, hand-offs, the morning routine, approval buttons, ignoring strangers).
 
-- Deploy: one small EC2/ECS instance plus ElastiCache Redis, or a single VPS with `docker compose`.
-- More agents: plug in MCP servers (GitHub, Gmail, Google Calendar) through the Agent SDK's `mcpServers` option.
-- Thread memory: pass earlier thread messages into the task so follow-ups have context.
+## Project structure
+
+```
+src/
+  bot.js            entry point: starts Slack and/or Telegram, routines, alerts
+  handle.js         platform-agnostic message handling: commands, fan-out, routing
+  router.js         who should answer: names → current teammate → Claude Haiku
+  runner.js         runs a teammate with the Agent SDK: tools, prompt, budget, session resume
+  agents.js         the team: role, model, tools, budget, prompt
+  channels.js       channel/topic → default team and context
+  teamtools.js      ask_teammate and create_routine (in-process MCP server)
+  routines.js       scheduler and the built-in morning X post
+  approvals.js      ✅ / ❌ store with pluggable executors
+  convo.js          shared per-conversation log
+  queue.js          in-memory queue (or BullMQ) with per-conversation locks
+  spend.js          daily budget and spend report
+  files.js          reads attachments (PDF, images, docx, xlsx)
+  outbox.js         .ics builder and file sharing tools
+  adapters/         slack.js, telegram.js, telegram-format.js
+  integrations/     Gmail, Google Calendar, Microsoft Graph, MIME
+scripts/            OAuth helpers, syntax check
+deploy/             rsync + systemd deploy to EC2, log helpers
+test/               node:test suites
+docs/               setup guide, architecture diagram, case study
+```
+
+## Roadmap
+
+- Turn inbox reading back on for Iris once prompt-injection defenses are tested against real mail.
+- Webhooks instead of long polling, and Redis by default, for a multi-instance deploy.
+- An eval set for routing and hand-off decisions.
+
+Read the [case study](docs/CASE_STUDY.md) for how it was built and what went wrong along the way.
+
+## License
+
+MIT © Kelvin Osei Boateng

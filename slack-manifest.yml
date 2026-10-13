@@ -21,6 +21,7 @@ oauth_config:
       - channels:history
       - channels:read
       - files:read
+      - files:write
       - groups:history
       - groups:read
       - reactions:write
@@ -32,5 +33,5 @@ settings:
       - message.channels
       - message.groups
   interactivity:
-    is_enabled: false
+    is_enabled: true
   socket_mode_enabled: true

@@ -1,18 +1,33 @@
 {
   "name": "agent-team",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "A team of AI agents (Claude Agent SDK) you message on Slack and Telegram: they route work, collaborate, hand off tasks, run daily routines and ask for approval before acting.",
+  "author": "Kelvin Osei Boateng",
+  "license": "MIT",
+  "keywords": [
+    "ai-agents",
+    "claude",
+    "agent-sdk",
+    "slack-bot",
+    "telegram-bot",
+    "multi-agent",
+    "automation",
+    "human-in-the-loop"
+  ],
   "type": "module",
-  "description": "A team of Claude agents you text on Slack. They work in the background and ping you when done.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/bot.js",
-    "bot": "node src/bot.js",
     "worker": "node src/worker.js",
-    "dev": "node --watch src/bot.js & node --watch src/worker.js",
-    "redis": "docker compose up -d redis"
-  },
-  "engines": {
-    "node": ">=20"
+    "dev": "node --watch src/bot.js",
+    "test": "node --test --experimental-test-module-mocks --test-concurrency=1 'test/**/*.test.js'",
+    "check": "node scripts/check.js",
+    "redis": "docker compose up -d redis",
+    "auth:google": "node scripts/auth-google.js",
+    "auth:microsoft": "node scripts/auth-microsoft.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.296",
@@ -22,7 +37,9 @@
     "bullmq": "^6.3.12",
     "dotenv": "^18.0.7",
     "exceljs": "^4.4.0",
+    "grammy": "^1.45.1",
     "ioredis": "^6.0.0",
-    "mammoth": "^1.12.0"
+    "mammoth": "^1.12.0",
+    "zod": "^4.0.0"
   }
 }

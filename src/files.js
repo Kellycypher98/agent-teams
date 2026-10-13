@@ -1,11 +1,11 @@
-// Turns files shared in Slack into something the agents can read.
+// Turns files Kelvin shares (Slack or Telegram) into something the agents can read.
 //   PDF            → native document block (Claude reads text, tables and layout)
 //   PNG/JPG/GIF/WebP → native image block
 //   DOCX           → plain text (mammoth)
 //   XLSX           → CSV per sheet (exceljs)
 //   text / code / CSV / JSON / Markdown → plain text
 // Every file is also saved under workspace/uploads/<thread>/ so Kai can open it with his tools.
-// Needs the files:read Slack scope.
+// The platform adapter does the actual download (Slack needs files:read; Telegram caps bots at 20 MB).
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,20 +25,6 @@ const TEXT_EXT = new Set(['txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'yaml',
 const ext = (f) => (f.filetype || path.extname(f.name || '').slice(1) || '').toLowerCase();
 const clip = (s) => (s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}\n…[truncated, ${s.length - MAX_TEXT} more characters]` : s);
 const safe = (s) => String(s).replace(/[^\w.\-]+/g, '_').slice(0, 120);
-
-// Keep only what the worker needs (also keeps Redis jobs small).
-export const slimFiles = (files = []) => files.map((f) => ({
-  id: f.id, name: f.name, title: f.title, filetype: f.filetype, mimetype: f.mimetype, size: f.size,
-  url: f.url_private_download || f.url_private,
-}));
-
-async function download(f) {
-  const res = await fetch(f.url, { headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` } });
-  if (!res.ok) throw new Error(`download failed (${res.status})`);
-  const type = res.headers.get('content-type') || '';
-  if (type.includes('text/html')) throw new Error('Slack returned a login page; add the files:read scope and reinstall the app');
-  return Buffer.from(await res.arrayBuffer());
-}
 
 async function xlsxToText(buf) {
   const wb = new ExcelJS.Workbook();
@@ -69,12 +55,13 @@ async function xlsxToText(buf) {
  * Downloads and converts Slack files.
  * Returns { blocks: content blocks for Claude, notes: lines to add to the prompt }.
  */
-export async function prepareFiles(files, threadKey) {
+export async function prepareFiles(files, threadKey, download) {
   const blocks = [];
   const notes = [];
   if (!files?.length) return { blocks, notes };
 
   const dir = path.join(workspace, 'uploads', safe(threadKey));
+  // Files are normalised by the adapter to { name, filetype, mimetype, size, ... }.
   fs.mkdirSync(dir, { recursive: true });
 
   for (const f of files) {

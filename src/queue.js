@@ -5,7 +5,7 @@
 import 'dotenv/config';
 
 export const QUEUE = 'agent-tasks';
-export const CONCURRENCY = Number(process.env.CONCURRENCY) || 3; // 3 so a whole standup runs at once
+export const CONCURRENCY = process.env.CONCURRENCY != null && process.env.CONCURRENCY !== '' ? Number(process.env.CONCURRENCY) : 3; // 3 so a whole standup runs at once
 export const useRedis = Boolean(process.env.REDIS_URL);
 
 let nextId = 1;
@@ -44,3 +44,6 @@ export async function enqueue(data) {
   pump();
   return id;
 }
+
+// For tests/debugging: jobs waiting in the built-in queue.
+export const pendingJobs = () => pending;

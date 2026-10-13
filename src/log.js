@@ -47,17 +47,23 @@ function write(level, msg, fields = {}) {
       Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => ` ${k}=${fmt(v)}`).join('');
   (LEVELS[level] >= LEVELS.warn ? console.error : console.log)(line);
 
-  if (level === 'error' && slack) {
+  if (level === 'error') {
     const details = Object.entries(fields).map(([k, v]) => `• ${k}: \`${v instanceof Error ? v.message : String(v)}\``).join('\n');
-    resolveAlertChannel()
-      .then((id) => id && slack.chat.postMessage({ channel: id, text: `🚨 *${msg}*\n${details}` }))
-      .catch(() => {});
+    const text = `🚨 *${msg}*\n${details}`;
+    if (slack && process.env.SLACK_BOT_TOKEN) {
+      resolveAlertChannel().then((id) => id && slack.chat.postMessage({ channel: id, text })).catch(() => {});
+    }
+    for (const sink of sinks) Promise.resolve().then(() => sink(text)).catch(() => {});
   }
 }
 
+// Extra places errors are sent to (e.g. a Telegram DM). fn(text)
+const sinks = [];
+export const addAlertSink = (fn) => sinks.push(fn);
+
 // Post a test alert so you can confirm the channel works (called once at startup).
 export async function announceAlerts(text) {
-  if (!slack) return;
+  if (!slack || !process.env.SLACK_BOT_TOKEN) return;
   const id = await resolveAlertChannel();
   if (id) await slack.chat.postMessage({ channel: id, text }).catch((err) => console.error(`WARN  can't post to LOG_CHANNEL: ${err.data?.error || err.message}`));
 }

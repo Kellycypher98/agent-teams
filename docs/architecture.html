@@ -1,0 +1,293 @@
+<title>Agent Team Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one wide system diagram (left→right: chat apps → EC2 → APIs), then the request lifecycle, teamwork and design decisions as short reference lists. */
+:root {
+  --bg: #F3F5F8; --surface: #FFFFFF; --group: #E8EDF2; --fg: #15202B; --muted: #5A6776; --line: #C3CDD8;
+  --accent: #0F766E; --kai: #B45309; --nova: #1D4ED8; --remy: #7C3AED; --iris: #BE185D;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E141B; --surface: #17212C; --group: #121A23; --fg: #E5ECF3; --muted: #93A2B3; --line: #354353;
+  --accent: #2DD4BF; --kai: #F59E0B; --nova: #60A5FA; --remy: #A78BFA; --iris: #F472B6; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E141B; --surface: #17212C; --group: #121A23; --fg: #E5ECF3; --muted: #93A2B3; --line: #354353;
+  --accent: #2DD4BF; --kai: #F59E0B; --nova: #60A5FA; --remy: #A78BFA; --iris: #F472B6; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--sans); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 36px; }
+header { display: grid; gap: 10px; max-width: 68ch; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; letter-spacing: -.02em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); font-size: 17px; }
+.stack { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 4px 0 0; list-style: none; }
+.stack li { font: 12px var(--mono); padding: 3px 9px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+
+figure { margin: 0; display: grid; gap: 12px; }
+.canvas { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.canvas svg { display: block; width: 100%; min-width: 900px; height: auto; }
+figcaption { color: var(--muted); font-size: 13px; max-width: 80ch; }
+
+/* SVG styling via page tokens */
+.grp { fill: var(--group); stroke: var(--line); stroke-dasharray: 5 4; }
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.ext { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.t { fill: var(--fg); font: 600 13px var(--sans); }
+.s { fill: var(--muted); font: 11px var(--mono); }
+.g { fill: var(--muted); font: 600 11px var(--mono); letter-spacing: .06em; }
+.edge { fill: none; stroke: var(--fg); stroke-width: 1.4; }
+.ret { fill: none; stroke: var(--accent); stroke-width: 1.8; }
+.halo { fill: none; stroke: var(--group); stroke-width: 7; }
+.lbl { fill: var(--muted); font: 11px var(--sans); }
+.rlbl { fill: var(--accent); font: 500 11px var(--sans); }
+.step circle { fill: var(--accent); }
+.step text { fill: var(--surface); font: 700 11px var(--sans); }
+#ah path { fill: var(--fg); } #ahr path { fill: var(--accent); }
+.kai { stroke: var(--kai); stroke-width: 2; fill: var(--surface); }
+.nova { stroke: var(--nova); stroke-width: 2; fill: var(--surface); }
+.remy { stroke: var(--remy); stroke-width: 2; fill: var(--surface); }
+.iris { stroke: var(--iris); stroke-width: 2; fill: var(--surface); }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; }
+.cols section { min-width: 0; }
+h2 { font-size: 13px; font-family: var(--mono); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+ol, ul.plain { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+ol li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+.n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--surface); font: 700 12px var(--sans); display: grid; place-items: center; margin-top: 2px; }
+ul.plain li { padding-left: 14px; border-left: 2px solid var(--line); }
+b { font-weight: 600; }
+code { font: 13px var(--mono); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Project · Kelvin Osei Boateng</div>
+    <h1>Agent Team</h1>
+    <p class="lede">A personal team of four Claude agents that lives in Slack and Telegram. Message a teammate by name or post in a project channel; they work in the background, pass work to each other, run daily routines, and ask before sending an email or booking a meeting.</p>
+    <ul class="stack" aria-label="Tech stack">
+      <li>Node.js 22</li><li>Claude Agent SDK</li><li>Anthropic API</li><li>Slack Bolt · Socket Mode</li><li>grammY · Telegram</li><li>Gmail + Google Calendar API</li><li>Microsoft Graph</li><li>AWS EC2 · systemd</li><li>node:test · GitHub Actions</li>
+    </ul>
+  </header>
+
+  <figure>
+    <div class="canvas">
+      <svg viewBox="0 0 1190 720" role="img" aria-label="Architecture: Slack and Telegram connect outbound to a Node process on AWS EC2. Platform adapters feed a shared handler that routes to one or more teammates and queues jobs. A runner executes Kai, Nova, Remy or Iris with the Claude Agent SDK. Team tools let them hand work to each other and propose routines; a scheduler runs routines; emails and calendar events wait for approval buttons. Replies go back through the adapter under each teammate's name.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+
+        <!-- chat apps -->
+        <rect class="grp" x="20" y="150" width="200" height="420" rx="10"/>
+        <text class="g" x="36" y="176">CHAT</text>
+        <rect class="box" x="36" y="190" width="168" height="44" rx="6"/>
+        <text class="t" x="50" y="211">Kelvin</text>
+        <text class="s" x="50" y="226">the only one obeyed</text>
+        <rect class="box" x="36" y="256" width="168" height="96" rx="6"/>
+        <text class="t" x="50" y="280">Slack</text>
+        <text class="s" x="50" y="300">one app, 4 personas</text>
+        <text class="s" x="50" y="317">channels · threads</text>
+        <text class="s" x="50" y="334">buttons · files</text>
+        <rect class="box" x="36" y="370" width="168" height="96" rx="6"/>
+        <text class="t" x="50" y="394">Telegram</text>
+        <text class="s" x="50" y="414">4 bots, one each</text>
+        <text class="s" x="50" y="431">topics · DMs</text>
+        <text class="s" x="50" y="448">inline buttons</text>
+        <text class="s" x="36" y="500">channel/topic → team</text>
+        <text class="s" x="36" y="518">"Kai and Nova, …" → both</text>
+        <text class="s" x="36" y="536">DM a bot → that teammate</text>
+
+        <!-- EC2 -->
+        <rect class="grp" x="245" y="30" width="670" height="670" rx="10"/>
+        <text class="g" x="261" y="688">AWS EC2 · Ubuntu 24.04 · systemd · one Node process (eu-central-1)</text>
+
+        <!-- row 1 -->
+        <rect class="box" x="270" y="70" width="170" height="70" rx="6"/>
+        <text class="t" x="284" y="93">adapters/</text>
+        <text class="s" x="284" y="111">slack.js · telegram.js</text>
+        <text class="s" x="284" y="127">post · edit · approve</text>
+
+        <rect class="box" x="480" y="70" width="180" height="70" rx="6"/>
+        <text class="t" x="494" y="93">handle.js</text>
+        <text class="s" x="494" y="111">commands · fan-out</text>
+        <text class="s" x="494" y="127">shared convo log</text>
+
+        <rect class="box" x="700" y="70" width="190" height="70" rx="6"/>
+        <text class="t" x="714" y="93">router.js</text>
+        <text class="s" x="714" y="111">names → thread owner</text>
+        <text class="s" x="714" y="127">→ Haiku picks</text>
+
+        <!-- row 2 -->
+        <rect class="box" x="270" y="190" width="170" height="70" rx="6"/>
+        <text class="t" x="284" y="213">routines.js</text>
+        <text class="s" x="284" y="231">scheduler · Berlin time</text>
+        <text class="s" x="284" y="247">08:00 Remy → Iris</text>
+
+        <rect class="box" x="480" y="190" width="180" height="70" rx="6"/>
+        <text class="t" x="494" y="213">queue.js</text>
+        <text class="s" x="494" y="231">in-memory or BullMQ</text>
+        <text class="s" x="494" y="247">per-conversation lock</text>
+
+        <rect class="box" x="700" y="190" width="190" height="70" rx="6"/>
+        <text class="t" x="714" y="213">runner.js</text>
+        <text class="s" x="714" y="231">Agent SDK query()</text>
+        <text class="s" x="714" y="247">budget · resume session</text>
+
+        <!-- agents -->
+        <rect class="kai" x="480" y="320" width="95" height="85" rx="6"/>
+        <text class="t" x="492" y="343">Kai</text>
+        <text class="s" x="492" y="361">Engineer</text>
+        <text class="s" x="492" y="390">code · git</text>
+        <rect class="nova" x="585" y="320" width="95" height="85" rx="6"/>
+        <text class="t" x="597" y="343">Nova</text>
+        <text class="s" x="597" y="361">Researcher</text>
+        <text class="s" x="597" y="390">web</text>
+        <rect class="remy" x="690" y="320" width="95" height="85" rx="6"/>
+        <text class="t" x="702" y="343">Remy</text>
+        <text class="s" x="702" y="361">Writer</text>
+        <text class="s" x="702" y="390">Haiku</text>
+        <rect class="iris" x="795" y="320" width="95" height="85" rx="6"/>
+        <text class="t" x="807" y="343">Iris</text>
+        <text class="s" x="807" y="361">Assistant</text>
+        <text class="s" x="807" y="390">mail · cal</text>
+
+        <!-- row 4 -->
+        <rect class="box" x="270" y="470" width="170" height="80" rx="6"/>
+        <text class="t" x="284" y="494">approvals.js</text>
+        <text class="s" x="284" y="512">✅ / ❌ before any</text>
+        <text class="s" x="284" y="528">send, booking, routine</text>
+
+        <rect class="box" x="560" y="470" width="330" height="80" rx="6"/>
+        <text class="t" x="574" y="494">teamtools (MCP)</text>
+        <text class="s" x="574" y="512">ask_teammate → hand-off, max 3 hops</text>
+        <text class="s" x="574" y="528">create_routine → needs approval</text>
+
+        <!-- row 5 storage -->
+        <rect class="box" x="270" y="590" width="300" height="70" rx="6"/>
+        <text class="t" x="284" y="613">data/ (JSON)</text>
+        <text class="s" x="284" y="631">sessions · shared log · routines</text>
+        <text class="s" x="284" y="647">approvals · daily spend · tokens</text>
+        <rect class="box" x="590" y="590" width="300" height="70" rx="6"/>
+        <text class="t" x="604" y="613">workspace/</text>
+        <text class="s" x="604" y="631">Kai's repos · uploaded files</text>
+        <text class="s" x="604" y="647">outbox: .ics calendar files</text>
+
+        <!-- externals -->
+        <rect class="ext" x="950" y="70" width="220" height="110" rx="8"/>
+        <text class="t" x="966" y="97">Anthropic API</text>
+        <text class="s" x="966" y="125">Haiku · routing, Remy,</text>
+        <text class="s" x="966" y="141">        standup replies</text>
+        <text class="s" x="966" y="163">Sonnet · Kai, Nova, Iris</text>
+
+        <rect class="ext" x="950" y="315" width="220" height="60" rx="8"/>
+        <text class="t" x="966" y="340">Gmail · Google Calendar</text>
+        <text class="s" x="966" y="360">REST · OAuth (PKCE)</text>
+        <rect class="ext" x="950" y="395" width="220" height="60" rx="8"/>
+        <text class="t" x="966" y="420">Microsoft Graph</text>
+        <text class="s" x="966" y="440">Outlook mail + calendar</text>
+        <text class="rlbl" x="1060" y="303" text-anchor="middle">sends &amp; books only after ✅</text>
+
+        <rect class="ext" x="950" y="475" width="220" height="60" rx="8"/>
+        <text class="t" x="966" y="500">The web</text>
+        <text class="s" x="966" y="520">WebSearch · WebFetch</text>
+
+        <rect class="ext" x="950" y="595" width="220" height="65" rx="8"/>
+        <text class="t" x="966" y="620">Your Mac</text>
+        <text class="s" x="966" y="640">deploy.sh → rsync + restart</text>
+
+        <!-- edges -->
+        <!-- 1 chat ↔ adapters (outbound connections) -->
+        <path class="edge" d="M204 304 H232"/>
+        <path class="edge" d="M204 418 H232 V105 H270" marker-end="url(#ah)"/>
+        <text class="lbl" x="120" y="595" text-anchor="middle">both connect outbound:</text>
+        <text class="lbl" x="120" y="610" text-anchor="middle">no open ports</text>
+        <!-- 2 adapters → handle → router -->
+        <path class="edge" d="M440 105 H480" marker-end="url(#ah)"/>
+                <path class="edge" d="M660 105 H700" marker-end="url(#ah)"/>
+        <text class="lbl" x="680" y="98" text-anchor="middle">who?</text>
+        <path class="edge" d="M890 105 H950" marker-end="url(#ah)"/>
+        <!-- 3 handle → queue -->
+        <path class="edge" d="M570 140 V190" marker-end="url(#ah)"/>
+        <text class="lbl" x="578" y="170">enqueue</text>
+        <!-- routines → queue -->
+        <path class="edge" d="M440 215 H480" marker-end="url(#ah)"/>
+        <!-- queue → runner -->
+        <path class="edge" d="M660 225 H700" marker-end="url(#ah)"/>
+        <!-- runner → Anthropic -->
+        <path class="edge" d="M890 240 H930 V150 H950" marker-end="url(#ah)"/>
+        <!-- 4 runner → agents -->
+        <path class="edge" d="M795 260 V290"/>
+        <path class="edge" d="M527 290 H842"/>
+        <path class="edge" d="M527 290 V320" marker-end="url(#ah)"/>
+        <path class="edge" d="M632 290 V320" marker-end="url(#ah)"/>
+        <path class="edge" d="M737 290 V320" marker-end="url(#ah)"/>
+        <path class="edge" d="M842 290 V320" marker-end="url(#ah)"/>
+        <!-- Nova → web -->
+        <path class="edge" d="M632 405 V440 H930 V505 H950" marker-end="url(#ah)"/>
+        <!-- agents → team tools -->
+        <path class="halo" d="M760 432 V448"/>
+        <path class="edge" d="M760 405 V470" marker-end="url(#ah)"/>
+        <!-- team tools → queue (hand-off becomes a new job) -->
+        <path class="edge" d="M560 490 H460 V245 H480" marker-end="url(#ah)"/>
+        <text class="lbl" x="452" y="370" text-anchor="middle" transform="rotate(-90 452 370)">hand-off = new job</text>
+        <!-- team tools → approvals -->
+        <path class="edge" d="M560 530 H440" marker-end="url(#ah)"/>
+        <!-- Iris → mail -->
+        <path class="edge" d="M890 345 H950" marker-end="url(#ah)"/>
+        <path class="edge" d="M890 385 H920 V425 H950" marker-end="url(#ah)"/>
+        <!-- Mac → EC2 -->
+        <path class="edge" d="M950 627 H915" marker-end="url(#ah)"/>
+        <text class="lbl" x="932" y="619" text-anchor="middle">SSH</text>
+
+        <!-- 5 reply path -->
+        <path class="halo" d="M905 97 V113"/>
+        <path class="ret" d="M890 205 H905 V50 H355 V70" marker-end="url(#ahr)"/>
+        <text class="rlbl" x="630" y="44" text-anchor="middle">replies under each teammate's name · "on it…" then edit</text>
+
+        <!-- step badges -->
+        <g class="step"><circle cx="232" cy="270" r="10"/><text x="232" y="274" text-anchor="middle">1</text></g>
+        <g class="step"><circle cx="460" cy="122" r="10"/><text x="460" y="126" text-anchor="middle">2</text></g>
+        <g class="step"><circle cx="552" cy="170" r="10"/><text x="552" y="174" text-anchor="middle">3</text></g>
+        <g class="step"><circle cx="812" cy="275" r="10"/><text x="812" y="279" text-anchor="middle">4</text></g>
+        <g class="step"><circle cx="355" cy="50" r="10"/><text x="355" y="54" text-anchor="middle">5</text></g>
+      </svg>
+    </div>
+    <figcaption>One Node process on a single EC2 instance serves both chat apps through a shared adapter interface. Jobs come from messages, from teammates handing work to each other, and from the routine scheduler; all of them go through the same queue, runner and daily budget.</figcaption>
+  </figure>
+
+  <div class="cols">
+    <section>
+      <h2>How a message moves</h2>
+      <ol>
+        <li><span class="n">1</span><span><b>Event.</b> A Slack message (Socket Mode) or Telegram update (long polling) reaches its adapter. Anyone but the owner is ignored.</span></li>
+        <li><span class="n">2</span><span><b>Route.</b> Names at the start ("Kai and Nova, …") or @mentions pick the teammates; otherwise the conversation's current teammate; otherwise Claude Haiku picks from the channel's team.</span></li>
+        <li><span class="n">3</span><span><b>Queue.</b> One job per teammate, with the channel's context. Jobs in the same conversation run in order.</span></li>
+        <li><span class="n">4</span><span><b>Run.</b> The Agent SDK runs the teammate with only its own tools, resuming its session and showing it what teammates just said.</span></li>
+        <li><span class="n">5</span><span><b>Reply.</b> "on it…" appears at once under the teammate's name, then is edited into the answer.</span></li>
+      </ol>
+    </section>
+    <section>
+      <h2>Working as a team</h2>
+      <ul class="plain">
+        <li><b>Hand-offs.</b> <code>ask_teammate</code> queues a job for another agent with the full context. Remy drafts, Iris sends; Nova researches, Remy writes it up. Capped at 3 hops.</li>
+        <li><b>Shared context.</b> Each conversation keeps a short log of who said what, so the second teammate builds on the first instead of repeating it.</li>
+        <li><b>Routines.</b> Every morning Remy writes an X post silently, hands it to Iris, and Iris DMs it for proofreading. New routines are proposed by the agents and start only after approval.</li>
+        <li><b>Approvals.</b> Emails, calendar events and routines wait for ✅ / ❌ buttons, run exactly once, and expire after 48 h.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Design decisions</h2>
+      <ul class="plain">
+        <li><b>No inbound ports.</b> Both chat apps connect outward, so the server only exposes SSH from one IP.</li>
+        <li><b>Least privilege.</b> Each agent has an explicit tool list in <code>dontAsk</code> mode. Iris treats email as untrusted and can only attach files from <code>workspace/</code>.</li>
+        <li><b>Platform-agnostic core.</b> Routing, teamwork, routines and approvals don't know which chat app they run in; adding Telegram meant writing one adapter.</li>
+        <li><b>Cost controls.</b> Haiku where it's enough, per-task caps, a daily budget and costs on every reply.</li>
+        <li><b>Tested.</b> 28 tests, including end-to-end runs against a fake Telegram API with the SDK mocked, in CI on every push.</li>
+      </ul>
+    </section>
+  </div>
+</div>
