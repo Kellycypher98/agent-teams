@@ -1,0 +1,13 @@
+#!/bin/sh
+# Server-side guard for Kai: only kai/* branches may be pushed, from any repo in workspace/.
+# Installed globally by deploy/bootstrap.sh (git config --global core.hooksPath).
+while read local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/kai/*) ;;
+    *) echo "pre-push: blocked push to ${remote_ref#refs/heads/} (only kai/* branches are allowed)" >&2; exit 1 ;;
+  esac
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    echo "pre-push: blocked deleting ${remote_ref#refs/heads/}" >&2; exit 1
+  fi
+done
+exit 0

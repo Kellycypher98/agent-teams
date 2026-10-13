@@ -68,7 +68,20 @@ Then `./deploy/deploy.sh`. Ask `help` to check both accounts show ✅.
 5. **Later updates**: `./deploy/deploy.sh`
 
 Logs: `ssh -i ~/.ssh/agent-team.pem ubuntu@<ip> 'journalctl -u <APP_NAME> -f'` (APP_NAME from `deploy/.deploy.env`, default `agent-team`)
-Repos for Kai: SSH in and `git clone` them into `~/agent-team/workspace/`.
+### Repos for Kai
+
+1. On GitHub create a fine-grained token: *Only select repositories* (pick the repos), *Repository permissions → Contents: Read and write*.
+2. On the server:
+   ```bash
+   git config --global credential.helper store
+   git config --global user.name "Kai (agent-team)"
+   git config --global user.email "<you@example.com>"
+   git config --global core.hooksPath ~/agent-team/deploy/git-hooks
+   cd ~/agent-team/workspace && git clone https://github.com/<you>/<repo>.git
+   ```
+   Paste the token as the password; it's saved for later pushes.
+
+Kai works on `kai/<topic>` branches, pushes them and sends you the pull-request link. The `pre-push` hook blocks pushes to any other branch and branch deletions, so you review and merge everything yourself.
 
 # Using the team
 
@@ -142,7 +155,7 @@ Settings in `.env`: `LOG_LEVEL=debug` also logs each tool call, `LOG_FORMAT=json
 
 - Only `OWNER_SLACK_ID` / `TELEGRAM_OWNER_ID` can give orders; everyone else is ignored.
 - Agents run in `dontAsk` mode, so they can only use the tools listed for them. Everything else is refused.
-- The code agent is told never to push or touch `.env`. Review its branches before merging.
+- Kai can only push `kai/*` branches (enforced by a git hook on the server) and never touches `.env`. Review his pull requests before merging.
 - Every report shows the cost of the run.
 
 ## Add an agent

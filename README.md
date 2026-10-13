@@ -8,7 +8,7 @@ I message them the way I'd message coworkers: _"Kai and Nova, should I add 2FA t
 
 | | Teammate | Does | Runs on |
 |---|---|---|---|
-| 🛠️ | **Kai**, engineer | Reads, edits and tests code in my repos, commits to branches (never pushes) | Sonnet |
+| 🛠️ | **Kai**, engineer | Reads, edits and tests code in my repos, pushes a `kai/…` branch and sends me the pull-request link | Sonnet |
 | 🔎 | **Nova**, researcher | Searches and reads the web, cites sources | Sonnet |
 | ✍️ | **Remy**, writer | Posts, emails, cover letters, the daily X post | Haiku |
 | 📅 | **Iris**, assistant | Drafts and sends email from Gmail and Outlook, checks both calendars, books events, makes `.ics` files | Sonnet |
@@ -28,7 +28,7 @@ I message them the way I'd message coworkers: _"Kai and Nova, should I add 2FA t
 ## Design decisions
 
 - **Platform-agnostic core.** Routing, teamwork, routines and approvals talk to a small adapter interface (`post`, `edit`, `askApproval`, `sendFile`, `dmWhere`, …). Adding Telegram meant writing one adapter, not touching the core.
-- **Least privilege per agent.** Every agent gets an explicit tool list and runs in the SDK's `dontAsk` mode, so anything else is refused. Only Iris has mail tools; only Kai has file and shell tools, working in `workspace/` under a non-root service user.
+- **Least privilege per agent.** Every agent gets an explicit tool list and runs in the SDK's `dontAsk` mode, so anything else is refused. Only Iris has mail tools; only Kai has file and shell tools, working in `workspace/` under a non-root service user. A server-side git hook only lets him push `kai/*` branches, so `main` stays mine.
 - **Email is untrusted input.** Iris is told never to follow instructions inside an email, and even if she were tricked, nothing leaves without my ✅. Attachments are restricted to the workspace (path traversal is tested).
 - **Hand-offs are just jobs.** A hand-off goes through the same queue, budget and per-conversation lock as a message, capped at three hops so agents can't bounce work forever.
 - **No inbound ports.** Slack Socket Mode and Telegram long polling both connect outward, so the server only exposes SSH from one IP.
