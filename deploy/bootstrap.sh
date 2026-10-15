@@ -21,7 +21,7 @@ echo "==> Installing dependencies ..."
 cd "${APP_DIR}"
 npm ci --omit=dev
 mkdir -p data workspace
-# Kai may only push kai/* branches from this server (see deploy/git-hooks/pre-push).
+# Kai may never push to main/master or delete branches from this server (see deploy/git-hooks/pre-push).
 git config --global core.hooksPath "${APP_DIR}/deploy/git-hooks"
 
 echo "==> Installing the ${APP_NAME} service ..."

@@ -81,7 +81,7 @@ Logs: `ssh -i ~/.ssh/agent-team.pem ubuntu@<ip> 'journalctl -u <APP_NAME> -f'` (
    ```
    Paste the token as the password; it's saved for later pushes.
 
-Kai works on `kai/<topic>` branches, pushes them and sends you the pull-request link. The `pre-push` hook blocks pushes to any other branch and branch deletions, so you review and merge everything yourself.
+Kai works on `kai/<topic>` branches, pushes them and sends you the pull-request link. The `pre-push` hook blocks pushes to `main`/`master` and branch deletions, so you review and merge everything yourself.
 
 # Using the team
 
@@ -155,7 +155,7 @@ Settings in `.env`: `LOG_LEVEL=debug` also logs each tool call, `LOG_FORMAT=json
 
 - Only `OWNER_SLACK_ID` / `TELEGRAM_OWNER_ID` can give orders; everyone else is ignored.
 - Agents run in `dontAsk` mode, so they can only use the tools listed for them. Everything else is refused.
-- Kai can only push `kai/*` branches (enforced by a git hook on the server) and never touches `.env`. Review his pull requests before merging.
+- Kai can never push to `main` or delete branches (enforced by a git hook on the server) and never touches `.env`. Review his pull requests before merging.
 - Every report shows the cost of the run.
 
 ## Add an agent

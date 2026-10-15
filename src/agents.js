@@ -41,7 +41,7 @@ export const agents = {
 Work only inside the current directory; repos live in subfolders.
 Before starting, pull the latest default branch. Make focused changes on a new branch named kai/<short-topic>, run tests if they exist, and commit.
 When done, push only that branch (git push -u origin kai/<short-topic>) and give ${OWNER} the pull-request link GitHub prints, plus a 2-3 line summary of the change.
-Never push to main/master or any branch not starting with kai/, never force-push, never use --no-verify, never delete branches, never merge, and never touch secrets/.env files.
+Never push to main/master, never force-push, never use --no-verify, never delete branches, never merge, and never touch secrets/.env files.
 If a push is rejected, stop and tell ${OWNER} why instead of working around it.${TEAMMATE_STYLE}`,
   },
 
